@@ -73,7 +73,8 @@
     </div>
 
     <button id="submitBtn" onclick="submitCheckIn()">確認報到</button>
-    
+
+    <div id="result"></div>
     <div id="statusMessage"></div>
   </div>
 
@@ -86,7 +87,6 @@
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
       const course = urlParams.get('course');
-      const token = urlParams.get('token');
       const courseInput = document.getElementById('courseCode');
       
       if (course) {
@@ -101,8 +101,8 @@
     async function submitCheckIn() {
       const studentId = document.getElementById('studentId').value.trim();
       const courseCode = document.getElementById('courseCode').value;
-      const statusDiv = document.getElementById('statusMessage');
       const submitBtn = document.getElementById('submitBtn');
+      const resultDiv = document.getElementById('result');
 
       // 基本防呆檢查
       if (!studentId) {
@@ -118,23 +118,45 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "報到傳送中...";
       showMessage("正在連線到系統...", "");
+      resultDiv.innerHTML = "";
 
-      // 準備要送給 GAS 的資料
+      // Step 1：取得 Token
+      let token;
+      try {
+        const response = await fetch(`${GAS_API_URL}?course=${encodeURIComponent(courseCode)}`);
+        const data = await response.json();
+
+        if (data.status === 'success') {
+          token = data.token;
+          resultDiv.innerHTML = `✅ 查詢成功！<br>該課程目前的 Token 為：<span style="font-size: 24px; color: #e67e22;">${data.token}</span>`;
+        } else {
+          resultDiv.innerText = "❌ " + data.message;
+          submitBtn.disabled = false;
+          submitBtn.innerText = "確認報到";
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+        resultDiv.innerText = "❌ 連線失敗，請確認 GAS 網址是否正確並已公開存取。";
+        submitBtn.disabled = false;
+        submitBtn.innerText = "確認報到";
+        return;
+      }
+
+      // Step 2：送出報到
       const payload = {
         studentId: studentId,
         courseCode: courseCode,
         token: token,
-        location: "前端暫未實作GPS定位" // 如果之後想加 GPS 可以改這裡
+        location: "前端暫未實作GPS定位"
       };
 
       try {
-        // 使用 Fetch API 發送 POST 請求給 Google Apps Script
         const response = await fetch(GAS_API_URL, {
           method: 'POST',
-          // GAS 接收 POST 預設建議轉成字串
-          body: JSON.stringify(payload), 
+          body: JSON.stringify(payload),
           headers: {
-            'Content-Type': 'text/plain;charset=utf-8', // 使用 text/plain 避免 CORS 預檢請求 (Preflight)
+            'Content-Type': 'text/plain;charset=utf-8',
           }
         });
 
@@ -142,9 +164,8 @@
 
         if (result.status === 'success') {
           showMessage(`✅ ${result.message}`, "success");
-          // 報到成功後可以清空輸入框，或隱藏按鈕
           document.getElementById('studentId').value = '';
-          submitBtn.style.display = 'none'; 
+          submitBtn.style.display = 'none';
         } else {
           showMessage(`❌ ${result.message}`, "error");
           submitBtn.disabled = false;
