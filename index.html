@@ -86,6 +86,7 @@
     window.onload = function() {
       const urlParams = new URLSearchParams(window.location.search);
       const course = urlParams.get('course');
+      const token = urlParams.get('token');
       const courseInput = document.getElementById('courseCode');
       
       if (course) {
@@ -122,6 +123,7 @@
       const payload = {
         studentId: studentId,
         courseCode: courseCode,
+        token: token,
         location: "前端暫未實作GPS定位" // 如果之後想加 GPS 可以改這裡
       };
 
